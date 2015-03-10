@@ -1,0 +1,32 @@
+{
+  "name": "resampler",
+  "version": "1.0.0",
+  "description": "Simple WebAudio based resampling library",
+  "main": "index.js",
+  "scripts": {
+    "test": "npm test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/notthetup/resampler.git"
+  },
+  "keywords": [
+    "webaudio",
+    "resample",
+    "audio"
+  ],
+  "author": "Chinmay Pendharkar <notthetup@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/notthetup/resampler/issues"
+  },
+  "homepage": "https://github.com/notthetup/resampler",
+  "dependencies": {
+    "encode-wav": "^0.1.0",
+    "webaudioloader": "^1.0.1"
+  },
+  "devDependencies": {
+    "browserify": "^9.0.3",
+    "jshint": "^2.6.3"
+  }
+}

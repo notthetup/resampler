@@ -1,0 +1,63 @@
+{
+    // JSHint Default Configuration File (as on JSHint website)
+    // See http://jshint.com/docs/ for more details
+
+    "maxerr"        : 50,       // {int} Maximum error before stopping
+
+    // Enforcing
+    "bitwise"       : true,     // true: Prohibit bitwise operators (&, |, ^, etc.)
+    "camelcase"     : true,    // true: Identifiers must be in camelCase
+    "curly"         : true,     // true: Require {} for every new block or scope
+    "forin"         : true,     // true: Require filtering for..in loops with obj.hasOwnProperty()
+    "indent"        : 4,        // {int} Number of spaces to use for indentation
+    "newcap"        : true,    // true: Require capitalization of all constructor functions
+    "noarg"         : true,     // true: Prohibit use of `arguments.caller`, `arguments.callee`
+    "noempty"       : true,     // true: Prohibit use of empty blocks
+    "nonew"         : true,    // true: Prohibit use of constructors without assignment
+    "undef"         : true,     // true: Require all non-global variables to be declared
+    "unused"        : true,     // true: Require all defined variables be used
+    "strict"        : true,     // true: Requires all functions run in ES5 Strict Mode
+    "trailing"      : true,    // true: Prohibit trailing whitespaces
+
+    // Relaxing
+    "asi"           : false,     // true: Tolerate Automatic Semicolon Insertion (no semicolons)
+    "boss"          : false,     // true: Tolerate assignments where comparisons are expected
+    "eqnull"        : false,     // true: Tolerate use of `== null`
+    "esnext"        : true,     // true: Allow ES.next (ES6) syntax (ex: `const`)
+    "evil"          : false,     // true: Tolerate use of `eval` and `new Function()`
+    "funcscope"     : true,     // true: Tolerate defining variables inside control statements"
+    "globalstrict"  : true,     // true: Allow global "use strict" (also enables 'strict')
+    "iterator"      : false,     // true: Tolerate using the `__iterator__` property
+    "lastsemic"     : false,     // true: Tolerate omitting a semicolon for the last statement
+    "laxbreak"      : false,     // true: Tolerate possibly unsafe line breakings
+    "laxcomma"      : false,     // true: Tolerate comma-first style coding
+    "loopfunc"      : true,     // true: Tolerate functions being defined in loops
+    "multistr"      : false,     // true: Tolerate multi-line strings
+    "proto"         : false,     // true: Tolerate using the `__proto__` property
+    "scripturl"     : false,     // true: Tolerate script-targeted URLs
+    "smarttabs"     : false,     // true: Tolerate mixed tabs/spaces when used for alignment
+    "shadow"        : false,     // true: Allows re-define variables later in code.
+    "sub"           : false,     // true: Tolerate using `[]` notation
+    "supernew"      : false,     // true: Tolerate `new function () { ... };` and `new Object;`
+    "validthis"     : false,     // true: Tolerate using this in a non-constructor function
+
+    // Environments
+    "browser"       : true,     // Web Browser (window, document, etc)
+    "devel"         : true,     // Development/debugging (alert, confirm, etc)
+    "jquery"       : true,
+    "node"          : true,
+
+    // Custom Globals
+    "globals"       : {
+        "define" : true,
+        "OfflineAudioContext": true,
+        "AudioContext" : true,
+        "AudioParam" : true,
+        "AudioNode" : true,
+        "AudioBuffer" : true,
+        "expect" : true,
+        "jasmine": true,
+        "describe": true,
+        "it" : true
+    }        // additional predefined global variables
+}
