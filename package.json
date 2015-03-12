@@ -2,9 +2,11 @@
   "name": "resampler",
   "version": "1.0.0",
   "description": "Simple WebAudio based resampling library",
-  "main": "index.js",
+  "main": "lib/resampler.js",
   "scripts": {
-    "test": "npm test"
+    "test": "npm test",
+    "prestart": "jshint index.js lib/resampler.js && browserify index.js > bundle.js",
+    "start": "http-server"
   },
   "repository": {
     "type": "git",
