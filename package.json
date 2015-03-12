@@ -5,8 +5,10 @@
   "main": "lib/resampler.js",
   "scripts": {
     "test": "npm test",
-    "prestart": "jshint index.js lib/resampler.js && browserify index.js > bundle.js",
-    "start": "http-server"
+    "build": "jshint index.js lib/resampler.js && browserify index.js > bundle.js",
+    "watch:index": "watch 'npm run build' . --wait=5",
+    "build:watch": "parallelshell 'npm run watch:index' 'http-server'",
+    "start": "npm run build && http-server"
   },
   "repository": {
     "type": "git",
@@ -29,6 +31,9 @@
   },
   "devDependencies": {
     "browserify": "^9.0.3",
-    "jshint": "^2.6.3"
+    "drag-drop": "^2.0.0",
+    "jshint": "^2.6.3",
+    "parallelshell": "^1.1.1",
+    "watch": "^0.14.0"
   }
 }

@@ -2,9 +2,33 @@
 "use strict";
 
 var resampler = require('./lib/resampler.js');
+var dragDrop = require('drag-drop');
 
 window.addEventListener('load', function(){
-	resampler('https://dl.dropboxusercontent.com/u/77191118/sounds/Hit5.mp3',192000, function(event){
+
+	var fSelectOption = document.getElementById('freqSelect');
+	var messageBox = document.getElementById('message');
+	var input = document.getElementById('input');
+	messageBox.addEventListener('click', function (){
+		input.click();
+	});
+
+	input.addEventListener('change', function(evt){
+		var chosenFile = evt.target.files[0];
+		var chosenSampleRate = parseInt(fSelectOption.selectedOptions[0].value);
+		console.log(chosenFile,chosenSampleRate);
+		resampleFile(chosenFile,chosenSampleRate);
+	});
+
+	dragDrop('#dropzone', function (files) {
+		var chosenFile = files[0] || files;
+		var chosenSampleRate = parseInt(fSelectOption.selectedOptions[0].value);
+		console.log(chosenFile,chosenSampleRate);
+		resampleFile(chosenFile,chosenSampleRate);
+	});
+
+	function resampleFile (file, targetSampleRate){
+		resampler(file, targetSampleRate, function(event){
 			event.getFile(function(fileEvent){
 				console.log(fileEvent);
 				var a = document.createElement("a");
@@ -14,11 +38,13 @@ window.addEventListener('load', function(){
 				a.download = "resampled.wav";
 				a.click();
 				window.URL.revokeObjectURL(fileEvent);
+				document.body.removeChild(a);
 			});
-	});
+		});
+	}
 });
 
-},{"./lib/resampler.js":2}],2:[function(require,module,exports){
+},{"./lib/resampler.js":2,"drag-drop":3}],2:[function(require,module,exports){
 "use strict";
 
 var WebAudioLoader = require('webaudioloader');
@@ -31,13 +57,17 @@ window.AudioContext = window.AudioContext || window.webkitAudioContext;
 var audioContext = new AudioContext();
 
 var wal = new WebAudioLoader({
-	context : audioContext,
-	cache : false
+    context : audioContext,
+    cache : false
 });
 
 /*
 * resampler = require('resampler');
-* resampler(file/URL/AudioBuffer, samplerRate, oncomplete) -> Promise
+* resampler(file/URL/AudioBuffer, sampleRate, oncomplete) -> Promise
+* resampler({
+    leftBuffer: TypedArray,
+    rightBuffer: TypedArray,
+    sampleRate : Number}, sampleRate, oncomplete) -> Promise
 * event.getFile();
 * event.getAudioBuffer();
 */
@@ -46,79 +76,527 @@ var wal = new WebAudioLoader({
 /*
 *
 */
-function resampler(file, targetSampleRate, oncomplete){
+function resampler(input, targetSampleRate, oncomplete){
 
-	if (!file && !targetSampleRate){
-		console.error('Error: First two arguments (audio file & target sample rate) are mandatory');
-		return; // return Rejected Promise
-	}
+    if (!input && !targetSampleRate){
+        return returnError('Error: First argument should be either a File, URL or AudioBuffer'); // return Rejected Promise
+    }
 
-	var inputType = Object.prototype.toString.call( file );
-	if (inputType !== '[object String]' && inputType !== '[object File]' &&
-		inputType !== '[object Blob]' && inputType !== '[object AudioBuffer]'){
-		console.error('Error: First argument should be either a File, URL or AudioBuffer');
-		return; // return Rejected Promise
-	}
+    var inputType = Object.prototype.toString.call( input );
+    if (inputType !== '[object String]' &&
+            inputType !== '[object File]' &&
+            inputType !== '[object AudioBuffer]' &&
+            inputType !== '[object Object]'){
+        return returnError('Error: First argument should be either a File, URL or AudioBuffer'); // return Rejected Promise
+    }
 
-	if(typeof targetSampleRate !== 'number' || targetSampleRate > 192000 || targetSampleRate < 3000){
-		console.error('Error: Second argument should be a numeric sample rate between 3000 and 192000');
-		return; // return Rejected Promise
-	}
+    if(typeof targetSampleRate !== 'number' ||
+        targetSampleRate > 192000 || targetSampleRate < 3000){
+        return returnError('Error: Second argument should be a numeric sample rate between 3000 and 192000');
+    }
 
-	if (inputType !== '[object AudioBuffer]'){
-		console.log('Loading/decoding file', file);
-		wal.load(file, {onload: fileDecodedCallback});
-	} else{
-		fileDecodedCallback(null, file);
-	}
+    if (inputType === '[object String]' || inputType === '[object File]'){
+        console.log('Loading/decoding input', input);
+        wal.load(input, {onload: function (err, audioBuffer){
+            if (err){
+                return returnError(err);
+            }
+            resampleAudioBuffer(audioBuffer);
+        }});
+    } else if (inputType === '[object AudioBuffer]'){
+        resampleAudioBuffer(input);
+    } else if (inputType === '[object Object]' && input.leftBuffer && input.sampleRate){
+        var numCh_ = input.rightBuffer ? 2 : 1;
+        var audioBuffer_ = audioContext.createBuffer(numCh_, input.leftBuffer.length, input.sampleRate);
+        resampleAudioBuffer(audioBuffer_);
+    }else{
+        return returnError('Error: Unknown input type');
+    }
 
-	function fileDecodedCallback(err, audioBuffer){
-		if (err){
-			console.error(err);
-			return; // return Rejected Promise
-		}
+    function returnError(errMsg){
+        console.error(errMsg);
+        if (typeof oncomplete === 'function'){
+            oncomplete(new Error(errMsg));
+        }
+        return;
+        // return Rejected Promise
+    }
 
-		console.log('Load/decod complete');
+    function resampleAudioBuffer(audioBuffer){
+        console.log('Starting Resampling');
 
-		var numCh_ = audioBuffer.numberOfChannels;
-		var numFrames_ = audioBuffer.length*targetSampleRate/audioBuffer.sampleRate;
+        var numCh_ = audioBuffer.numberOfChannels;
+        var numFrames_ = audioBuffer.length*targetSampleRate/audioBuffer.sampleRate;
 
-		var offlineContext_ = new OfflineAudioContext(numCh_, numFrames_, targetSampleRate);
-		var bufferSource_ = offlineContext_.createBufferSource();
-		bufferSource_.buffer = audioBuffer;
+        var offlineContext_ = new OfflineAudioContext(numCh_, numFrames_, targetSampleRate);
+        var bufferSource_ = offlineContext_.createBufferSource();
+        bufferSource_.buffer = audioBuffer;
 
-		offlineContext_.oncomplete = function(event){
-			var resampeledBuffer = event.renderedBuffer;
-			console.log('Done Rendering');
-			if (typeof oncomplete === 'function'){
-				oncomplete({
-					getAudioBuffer: function(){
-						return resampeledBuffer;
-					},
-					getFile : function (fileCallback){
-						encoder.encodeWAV(resampeledBuffer,resampeledBuffer.sampleRate,
-							function(blob) {
-								console.log('wav encoding complete: ', blob );
-								if (blob) {
-									fileCallback(URL.createObjectURL(blob));
-								}
-							});
-					}
-				});
-			}
-		};
+        offlineContext_.oncomplete = function(event){
+            var resampeledBuffer = event.renderedBuffer;
+            console.log('Done Rendering');
+            if (typeof oncomplete === 'function'){
+                oncomplete({
+                    getAudioBuffer: function(){
+                        return resampeledBuffer;
+                    },
+                    getFile : function (fileCallback){
+                        encoder.encodeWAV(resampeledBuffer,resampeledBuffer.sampleRate,
+                            function(blob) {
+                                console.log('wav encoding complete: ', blob );
+                                if (blob) {
+                                    fileCallback(URL.createObjectURL(blob));
+                                }
+                            });
+                    }
+                });
+            }
+        };
 
-		console.log('Starting Offline Rendering');
-		bufferSource_.connect(offlineContext_.destination);
-		bufferSource_.start(0);
-		offlineContext_.startRendering();
-	}
+        console.log('Starting Offline Rendering');
+        bufferSource_.connect(offlineContext_.destination);
+        bufferSource_.start(0);
+        offlineContext_.startRendering();
+    }
 }
 
 
 module.exports = resampler;
 
-},{"encode-wav":3,"webaudioloader":6}],3:[function(require,module,exports){
+},{"encode-wav":11,"webaudioloader":14}],3:[function(require,module,exports){
+module.exports = DragDrop
+
+var throttle = require('lodash.throttle')
+
+function DragDrop (elem, cb) {
+  if (typeof elem === 'string') elem = document.querySelector(elem)
+  elem.addEventListener('dragenter', killEvent, false)
+  elem.addEventListener('dragover', makeOnDragOver(elem), false)
+  elem.addEventListener('drop', onDrop.bind(undefined, elem, cb), false)
+}
+
+function killEvent (e) {
+  e.stopPropagation()
+  e.preventDefault()
+  return false
+}
+
+function makeOnDragOver (elem) {
+  var fn = throttle(function () {
+    elem.classList.add('drag')
+
+    if (elem.timeout) clearTimeout(elem.timeout)
+    elem.timeout = setTimeout(function () {
+      elem.classList.remove('drag')
+    }, 150)
+  }, 100, {trailing: false})
+
+  return function (e) {
+    e.stopPropagation()
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+    fn()
+  }
+}
+
+function onDrop (elem, cb, e) {
+  e.stopPropagation()
+  e.preventDefault()
+  elem.classList.remove('drag')
+  cb(Array.prototype.slice.call(e.dataTransfer.files), { x: e.clientX, y: e.clientY })
+  return false
+}
+
+},{"lodash.throttle":4}],4:[function(require,module,exports){
+/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+var debounce = require('lodash.debounce'),
+    isFunction = require('lodash.isfunction'),
+    isObject = require('lodash.isobject');
+
+/** Used as an internal `_.debounce` options object */
+var debounceOptions = {
+  'leading': false,
+  'maxWait': 0,
+  'trailing': false
+};
+
+/**
+ * Creates a function that, when executed, will only call the `func` function
+ * at most once per every `wait` milliseconds. Provide an options object to
+ * indicate that `func` should be invoked on the leading and/or trailing edge
+ * of the `wait` timeout. Subsequent calls to the throttled function will
+ * return the result of the last `func` call.
+ *
+ * Note: If `leading` and `trailing` options are `true` `func` will be called
+ * on the trailing edge of the timeout only if the the throttled function is
+ * invoked more than once during the `wait` timeout.
+ *
+ * @static
+ * @memberOf _
+ * @category Functions
+ * @param {Function} func The function to throttle.
+ * @param {number} wait The number of milliseconds to throttle executions to.
+ * @param {Object} [options] The options object.
+ * @param {boolean} [options.leading=true] Specify execution on the leading edge of the timeout.
+ * @param {boolean} [options.trailing=true] Specify execution on the trailing edge of the timeout.
+ * @returns {Function} Returns the new throttled function.
+ * @example
+ *
+ * // avoid excessively updating the position while scrolling
+ * var throttled = _.throttle(updatePosition, 100);
+ * jQuery(window).on('scroll', throttled);
+ *
+ * // execute `renewToken` when the click event is fired, but not more than once every 5 minutes
+ * jQuery('.interactive').on('click', _.throttle(renewToken, 300000, {
+ *   'trailing': false
+ * }));
+ */
+function throttle(func, wait, options) {
+  var leading = true,
+      trailing = true;
+
+  if (!isFunction(func)) {
+    throw new TypeError;
+  }
+  if (options === false) {
+    leading = false;
+  } else if (isObject(options)) {
+    leading = 'leading' in options ? options.leading : leading;
+    trailing = 'trailing' in options ? options.trailing : trailing;
+  }
+  debounceOptions.leading = leading;
+  debounceOptions.maxWait = wait;
+  debounceOptions.trailing = trailing;
+
+  return debounce(func, wait, debounceOptions);
+}
+
+module.exports = throttle;
+
+},{"lodash.debounce":5,"lodash.isfunction":8,"lodash.isobject":9}],5:[function(require,module,exports){
+/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+var isFunction = require('lodash.isfunction'),
+    isObject = require('lodash.isobject'),
+    now = require('lodash.now');
+
+/* Native method shortcuts for methods with the same name as other `lodash` methods */
+var nativeMax = Math.max;
+
+/**
+ * Creates a function that will delay the execution of `func` until after
+ * `wait` milliseconds have elapsed since the last time it was invoked.
+ * Provide an options object to indicate that `func` should be invoked on
+ * the leading and/or trailing edge of the `wait` timeout. Subsequent calls
+ * to the debounced function will return the result of the last `func` call.
+ *
+ * Note: If `leading` and `trailing` options are `true` `func` will be called
+ * on the trailing edge of the timeout only if the the debounced function is
+ * invoked more than once during the `wait` timeout.
+ *
+ * @static
+ * @memberOf _
+ * @category Functions
+ * @param {Function} func The function to debounce.
+ * @param {number} wait The number of milliseconds to delay.
+ * @param {Object} [options] The options object.
+ * @param {boolean} [options.leading=false] Specify execution on the leading edge of the timeout.
+ * @param {number} [options.maxWait] The maximum time `func` is allowed to be delayed before it's called.
+ * @param {boolean} [options.trailing=true] Specify execution on the trailing edge of the timeout.
+ * @returns {Function} Returns the new debounced function.
+ * @example
+ *
+ * // avoid costly calculations while the window size is in flux
+ * var lazyLayout = _.debounce(calculateLayout, 150);
+ * jQuery(window).on('resize', lazyLayout);
+ *
+ * // execute `sendMail` when the click event is fired, debouncing subsequent calls
+ * jQuery('#postbox').on('click', _.debounce(sendMail, 300, {
+ *   'leading': true,
+ *   'trailing': false
+ * });
+ *
+ * // ensure `batchLog` is executed once after 1 second of debounced calls
+ * var source = new EventSource('/stream');
+ * source.addEventListener('message', _.debounce(batchLog, 250, {
+ *   'maxWait': 1000
+ * }, false);
+ */
+function debounce(func, wait, options) {
+  var args,
+      maxTimeoutId,
+      result,
+      stamp,
+      thisArg,
+      timeoutId,
+      trailingCall,
+      lastCalled = 0,
+      maxWait = false,
+      trailing = true;
+
+  if (!isFunction(func)) {
+    throw new TypeError;
+  }
+  wait = nativeMax(0, wait) || 0;
+  if (options === true) {
+    var leading = true;
+    trailing = false;
+  } else if (isObject(options)) {
+    leading = options.leading;
+    maxWait = 'maxWait' in options && (nativeMax(wait, options.maxWait) || 0);
+    trailing = 'trailing' in options ? options.trailing : trailing;
+  }
+  var delayed = function() {
+    var remaining = wait - (now() - stamp);
+    if (remaining <= 0) {
+      if (maxTimeoutId) {
+        clearTimeout(maxTimeoutId);
+      }
+      var isCalled = trailingCall;
+      maxTimeoutId = timeoutId = trailingCall = undefined;
+      if (isCalled) {
+        lastCalled = now();
+        result = func.apply(thisArg, args);
+        if (!timeoutId && !maxTimeoutId) {
+          args = thisArg = null;
+        }
+      }
+    } else {
+      timeoutId = setTimeout(delayed, remaining);
+    }
+  };
+
+  var maxDelayed = function() {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+    maxTimeoutId = timeoutId = trailingCall = undefined;
+    if (trailing || (maxWait !== wait)) {
+      lastCalled = now();
+      result = func.apply(thisArg, args);
+      if (!timeoutId && !maxTimeoutId) {
+        args = thisArg = null;
+      }
+    }
+  };
+
+  return function() {
+    args = arguments;
+    stamp = now();
+    thisArg = this;
+    trailingCall = trailing && (timeoutId || !leading);
+
+    if (maxWait === false) {
+      var leadingCall = leading && !timeoutId;
+    } else {
+      if (!maxTimeoutId && !leading) {
+        lastCalled = stamp;
+      }
+      var remaining = maxWait - (stamp - lastCalled),
+          isCalled = remaining <= 0;
+
+      if (isCalled) {
+        if (maxTimeoutId) {
+          maxTimeoutId = clearTimeout(maxTimeoutId);
+        }
+        lastCalled = stamp;
+        result = func.apply(thisArg, args);
+      }
+      else if (!maxTimeoutId) {
+        maxTimeoutId = setTimeout(maxDelayed, remaining);
+      }
+    }
+    if (isCalled && timeoutId) {
+      timeoutId = clearTimeout(timeoutId);
+    }
+    else if (!timeoutId && wait !== maxWait) {
+      timeoutId = setTimeout(delayed, wait);
+    }
+    if (leadingCall) {
+      isCalled = true;
+      result = func.apply(thisArg, args);
+    }
+    if (isCalled && !timeoutId && !maxTimeoutId) {
+      args = thisArg = null;
+    }
+    return result;
+  };
+}
+
+module.exports = debounce;
+
+},{"lodash.isfunction":8,"lodash.isobject":9,"lodash.now":6}],6:[function(require,module,exports){
+/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+var isNative = require('lodash._isnative');
+
+/**
+ * Gets the number of milliseconds that have elapsed since the Unix epoch
+ * (1 January 1970 00:00:00 UTC).
+ *
+ * @static
+ * @memberOf _
+ * @category Utilities
+ * @example
+ *
+ * var stamp = _.now();
+ * _.defer(function() { console.log(_.now() - stamp); });
+ * // => logs the number of milliseconds it took for the deferred function to be called
+ */
+var now = isNative(now = Date.now) && now || function() {
+  return new Date().getTime();
+};
+
+module.exports = now;
+
+},{"lodash._isnative":7}],7:[function(require,module,exports){
+/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+
+/** Used for native method references */
+var objectProto = Object.prototype;
+
+/** Used to resolve the internal [[Class]] of values */
+var toString = objectProto.toString;
+
+/** Used to detect if a method is native */
+var reNative = RegExp('^' +
+  String(toString)
+    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    .replace(/toString| for [^\]]+/g, '.*?') + '$'
+);
+
+/**
+ * Checks if `value` is a native function.
+ *
+ * @private
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if the `value` is a native function, else `false`.
+ */
+function isNative(value) {
+  return typeof value == 'function' && reNative.test(value);
+}
+
+module.exports = isNative;
+
+},{}],8:[function(require,module,exports){
+/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+
+/**
+ * Checks if `value` is a function.
+ *
+ * @static
+ * @memberOf _
+ * @category Objects
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if the `value` is a function, else `false`.
+ * @example
+ *
+ * _.isFunction(_);
+ * // => true
+ */
+function isFunction(value) {
+  return typeof value == 'function';
+}
+
+module.exports = isFunction;
+
+},{}],9:[function(require,module,exports){
+/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+var objectTypes = require('lodash._objecttypes');
+
+/**
+ * Checks if `value` is the language type of Object.
+ * (e.g. arrays, functions, objects, regexes, `new Number(0)`, and `new String('')`)
+ *
+ * @static
+ * @memberOf _
+ * @category Objects
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if the `value` is an object, else `false`.
+ * @example
+ *
+ * _.isObject({});
+ * // => true
+ *
+ * _.isObject([1, 2, 3]);
+ * // => true
+ *
+ * _.isObject(1);
+ * // => false
+ */
+function isObject(value) {
+  // check if the value is the ECMAScript language type of Object
+  // http://es5.github.io/#x8
+  // and avoid a V8 bug
+  // http://code.google.com/p/v8/issues/detail?id=2291
+  return !!(value && objectTypes[typeof value]);
+}
+
+module.exports = isObject;
+
+},{"lodash._objecttypes":10}],10:[function(require,module,exports){
+/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+
+/** Used to determine if values are of the language type Object */
+var objectTypes = {
+  'boolean': false,
+  'function': true,
+  'object': true,
+  'number': false,
+  'string': false,
+  'undefined': false
+};
+
+module.exports = objectTypes;
+
+},{}],11:[function(require,module,exports){
 var work = require('webworkify');
 var w = work(require('./work.js'));
 
@@ -159,7 +637,7 @@ function getDownloadLink(cb) {
   })
 }
 
-},{"./work.js":5,"webworkify":4}],4:[function(require,module,exports){
+},{"./work.js":13,"webworkify":12}],12:[function(require,module,exports){
 var bundleFn = arguments[3];
 var sources = arguments[4];
 var cache = arguments[5];
@@ -216,7 +694,7 @@ module.exports = function (fn) {
     ));
 };
 
-},{}],5:[function(require,module,exports){
+},{}],13:[function(require,module,exports){
 module.exports = function(self) {
   self.addEventListener('message', function(ev) {
     console.log('worker', ev);
@@ -320,7 +798,7 @@ function floatTo16BitPCM(output, offset, input){
   }
 }
 
-},{}],6:[function(require,module,exports){
+},{}],14:[function(require,module,exports){
 "use strict";
 
 /*
@@ -398,9 +876,13 @@ function WebAudioLoader (options){
 		}
 
 		request.onload = function () {
-			if (request.status === 200){
+			if (urlType === '[object String]' && request.status === 200){
 				if (typeof onload === 'function'){
 					onload(null, request.response);
+				}
+			}else if (urlType === '[object File]' || urlType === '[object Blob]'){
+				if (typeof onload === 'function'){
+						onload(null, request.result);
 				}
 			}else{
 				if (typeof onload === 'function'){
@@ -500,7 +982,7 @@ WebAudioLoader.prototype.flushCache = function (){
 
 module.exports = WebAudioLoader;
 
-},{"lru-cache":7}],7:[function(require,module,exports){
+},{"lru-cache":15}],15:[function(require,module,exports){
 ;(function () { // closure for web browsers
 
 if (typeof module === 'object' && module.exports) {

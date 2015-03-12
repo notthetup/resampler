@@ -50,6 +50,7 @@
     // Custom Globals
     "globals"       : {
         "define" : true,
+        "Dropzone":true,
         "OfflineAudioContext": true,
         "AudioContext" : true,
         "AudioParam" : true,

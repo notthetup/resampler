@@ -2,9 +2,53 @@
 <html>
 <head>
 	<title>Resampler Test</title>
+	<style type="text/css">
+		.dropzone {
+			border: 2px solid rgba(0, 0, 0, 0.3);
+			border-radius: 5px;
+			background: white;
+			max-width: 60%;
+			margin-left: auto;
+			margin-right: auto;
+			min-height: 150px;
+			background: white;
+			padding: 20px 20px;
+		}
+		.dropzone .message {
+			font-weight: 400;
+			font-family: Roboto, 'Open Sans', sans-serif;
+			font-kerning: auto;
+			font-size: 20px;
+			cursor: pointer;
+			text-align: center;
+			margin: 2em 0;
+		}
+		.dropzone .message .note {
+			font-size: 0.8em;
+			font-weight: 200;
+			display: block;
+			margin-top: 1.4rem;
+		}
+
+	</style>
 	<script src="bundle.js"></script>
 </head>
 <body>
-
+	<select id="freqSelect">
+		<option value="192000">192kHz</option>
+		<option value="96000">96kHz</option>
+		<option value="48000">48kHz</option>
+		<option value="44100">44.1kHz</option>
+		<option value="32000">32kHz</option>
+		<option value="22050">22.05kHz</option>
+		<option value="11025">11.025kHz</option>
+		<option value="8000">8kHz</option>
+	</select>
+	<form class="dropzone" id="dropzone">
+  <div id="message" class="message">
+    Drop files here or click to upload an audio file to resample.<br>
+  </div>
+  <input id="input" type="file" style="visibility:hidden">
+</form>
 </body>
 </html>
