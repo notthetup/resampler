@@ -26,7 +26,7 @@
   },
   "homepage": "https://github.com/notthetup/resampler",
   "dependencies": {
-    "encode-wav": "^0.1.0",
+    "encode-wav": "notthetup/encodeWAV#audiobuffer",
     "webaudioloader": "^1.0.1"
   },
   "devDependencies": {

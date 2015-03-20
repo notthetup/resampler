@@ -123,7 +123,7 @@ function resampler(input, targetSampleRate, oncomplete){
     }
 
     function resampleAudioBuffer(audioBuffer){
-        console.log('Starting Resampling');
+        console.log('Starting Resampling - ', audioBuffer);
 
         var numCh_ = audioBuffer.numberOfChannels;
         var numFrames_ = audioBuffer.length*targetSampleRate/audioBuffer.sampleRate;
@@ -163,7 +163,7 @@ function resampler(input, targetSampleRate, oncomplete){
 
 module.exports = resampler;
 
-},{"encode-wav":11,"webaudioloader":14}],3:[function(require,module,exports){
+},{"encode-wav":7,"webaudioloader":10}],3:[function(require,module,exports){
 module.exports = DragDrop
 
 var throttle = require('lodash.throttle')
@@ -209,18 +209,19 @@ function onDrop (elem, cb, e) {
 
 },{"lodash.throttle":4}],4:[function(require,module,exports){
 /**
- * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
- * Build: `lodash modularize modern exports="npm" -o ./npm/`
- * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
- * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
- * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
- * Available under MIT license <http://lodash.com/license>
+ * lodash 3.0.1 (Custom Build) <https://lodash.com/>
+ * Build: `lodash modern modularize exports="npm" -o ./`
+ * Copyright 2012-2015 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.7.0 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2015 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <https://lodash.com/license>
  */
-var debounce = require('lodash.debounce'),
-    isFunction = require('lodash.isfunction'),
-    isObject = require('lodash.isobject');
+var debounce = require('lodash.debounce');
 
-/** Used as an internal `_.debounce` options object */
+/** Used as the `TypeError` message for "Functions" methods. */
+var FUNC_ERROR_TEXT = 'Expected a function';
+
+/** Used as an internal `_.debounce` options object by `_.throttle`. */
 var debounceOptions = {
   'leading': false,
   'maxWait': 0,
@@ -228,112 +229,190 @@ var debounceOptions = {
 };
 
 /**
- * Creates a function that, when executed, will only call the `func` function
- * at most once per every `wait` milliseconds. Provide an options object to
- * indicate that `func` should be invoked on the leading and/or trailing edge
- * of the `wait` timeout. Subsequent calls to the throttled function will
- * return the result of the last `func` call.
+ * Creates a function that only invokes `func` at most once per every `wait`
+ * milliseconds. The created function comes with a `cancel` method to cancel
+ * delayed invocations. Provide an options object to indicate that `func`
+ * should be invoked on the leading and/or trailing edge of the `wait` timeout.
+ * Subsequent calls to the throttled function return the result of the last
+ * `func` call.
  *
- * Note: If `leading` and `trailing` options are `true` `func` will be called
+ * **Note:** If `leading` and `trailing` options are `true`, `func` is invoked
  * on the trailing edge of the timeout only if the the throttled function is
  * invoked more than once during the `wait` timeout.
  *
+ * See [David Corbacho's article](http://drupalmotion.com/article/debounce-and-throttle-visual-explanation)
+ * for details over the differences between `_.throttle` and `_.debounce`.
+ *
  * @static
  * @memberOf _
- * @category Functions
+ * @category Function
  * @param {Function} func The function to throttle.
- * @param {number} wait The number of milliseconds to throttle executions to.
+ * @param {number} wait The number of milliseconds to throttle invocations to.
  * @param {Object} [options] The options object.
- * @param {boolean} [options.leading=true] Specify execution on the leading edge of the timeout.
- * @param {boolean} [options.trailing=true] Specify execution on the trailing edge of the timeout.
+ * @param {boolean} [options.leading=true] Specify invoking on the leading
+ *  edge of the timeout.
+ * @param {boolean} [options.trailing=true] Specify invoking on the trailing
+ *  edge of the timeout.
  * @returns {Function} Returns the new throttled function.
  * @example
  *
  * // avoid excessively updating the position while scrolling
- * var throttled = _.throttle(updatePosition, 100);
- * jQuery(window).on('scroll', throttled);
+ * jQuery(window).on('scroll', _.throttle(updatePosition, 100));
  *
- * // execute `renewToken` when the click event is fired, but not more than once every 5 minutes
- * jQuery('.interactive').on('click', _.throttle(renewToken, 300000, {
- *   'trailing': false
- * }));
+ * // invoke `renewToken` when the click event is fired, but not more than once every 5 minutes
+ * var throttled =  _.throttle(renewToken, 300000, { 'trailing': false })
+ * jQuery('.interactive').on('click', throttled);
+ *
+ * // cancel a trailing throttled call
+ * jQuery(window).on('popstate', throttled.cancel);
  */
 function throttle(func, wait, options) {
   var leading = true,
       trailing = true;
 
-  if (!isFunction(func)) {
-    throw new TypeError;
+  if (typeof func != 'function') {
+    throw new TypeError(FUNC_ERROR_TEXT);
   }
   if (options === false) {
     leading = false;
   } else if (isObject(options)) {
-    leading = 'leading' in options ? options.leading : leading;
-    trailing = 'trailing' in options ? options.trailing : trailing;
+    leading = 'leading' in options ? !!options.leading : leading;
+    trailing = 'trailing' in options ? !!options.trailing : trailing;
   }
   debounceOptions.leading = leading;
-  debounceOptions.maxWait = wait;
+  debounceOptions.maxWait = +wait;
   debounceOptions.trailing = trailing;
-
   return debounce(func, wait, debounceOptions);
+}
+
+/**
+ * Checks if `value` is the language type of `Object`.
+ * (e.g. arrays, functions, objects, regexes, `new Number(0)`, and `new String('')`)
+ *
+ * **Note:** See the [ES5 spec](https://es5.github.io/#x8) for more details.
+ *
+ * @static
+ * @memberOf _
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is an object, else `false`.
+ * @example
+ *
+ * _.isObject({});
+ * // => true
+ *
+ * _.isObject([1, 2, 3]);
+ * // => true
+ *
+ * _.isObject(1);
+ * // => false
+ */
+function isObject(value) {
+  // Avoid a V8 JIT bug in Chrome 19-20.
+  // See https://code.google.com/p/v8/issues/detail?id=2291 for more details.
+  var type = typeof value;
+  return type == 'function' || (value && type == 'object') || false;
 }
 
 module.exports = throttle;
 
-},{"lodash.debounce":5,"lodash.isfunction":8,"lodash.isobject":9}],5:[function(require,module,exports){
+},{"lodash.debounce":5}],5:[function(require,module,exports){
 /**
- * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
- * Build: `lodash modularize modern exports="npm" -o ./npm/`
- * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
- * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
- * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
- * Available under MIT license <http://lodash.com/license>
+ * lodash 3.0.2 (Custom Build) <https://lodash.com/>
+ * Build: `lodash modern modularize exports="npm" -o ./`
+ * Copyright 2012-2015 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.8.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2015 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <https://lodash.com/license>
  */
-var isFunction = require('lodash.isfunction'),
-    isObject = require('lodash.isobject'),
-    now = require('lodash.now');
+var isNative = require('lodash.isnative');
 
-/* Native method shortcuts for methods with the same name as other `lodash` methods */
-var nativeMax = Math.max;
+/** Used as the `TypeError` message for "Functions" methods. */
+var FUNC_ERROR_TEXT = 'Expected a function';
+
+/* Native method references for those with the same name as other `lodash` methods. */
+var nativeMax = Math.max,
+    nativeNow = isNative(nativeNow = Date.now) && nativeNow;
 
 /**
- * Creates a function that will delay the execution of `func` until after
- * `wait` milliseconds have elapsed since the last time it was invoked.
- * Provide an options object to indicate that `func` should be invoked on
- * the leading and/or trailing edge of the `wait` timeout. Subsequent calls
- * to the debounced function will return the result of the last `func` call.
- *
- * Note: If `leading` and `trailing` options are `true` `func` will be called
- * on the trailing edge of the timeout only if the the debounced function is
- * invoked more than once during the `wait` timeout.
+ * Gets the number of milliseconds that have elapsed since the Unix epoch
+ * (1 January 1970 00:00:00 UTC).
  *
  * @static
  * @memberOf _
- * @category Functions
+ * @category Date
+ * @example
+ *
+ * _.defer(function(stamp) {
+ *   console.log(_.now() - stamp);
+ * }, _.now());
+ * // => logs the number of milliseconds it took for the deferred function to be invoked
+ */
+var now = nativeNow || function() {
+  return new Date().getTime();
+};
+
+/**
+ * Creates a function that delays invoking `func` until after `wait` milliseconds
+ * have elapsed since the last time it was invoked. The created function comes
+ * with a `cancel` method to cancel delayed invocations. Provide an options
+ * object to indicate that `func` should be invoked on the leading and/or
+ * trailing edge of the `wait` timeout. Subsequent calls to the debounced
+ * function return the result of the last `func` invocation.
+ *
+ * **Note:** If `leading` and `trailing` options are `true`, `func` is invoked
+ * on the trailing edge of the timeout only if the the debounced function is
+ * invoked more than once during the `wait` timeout.
+ *
+ * See [David Corbacho's article](http://drupalmotion.com/article/debounce-and-throttle-visual-explanation)
+ * for details over the differences between `_.debounce` and `_.throttle`.
+ *
+ * @static
+ * @memberOf _
+ * @category Function
  * @param {Function} func The function to debounce.
- * @param {number} wait The number of milliseconds to delay.
+ * @param {number} [wait=0] The number of milliseconds to delay.
  * @param {Object} [options] The options object.
- * @param {boolean} [options.leading=false] Specify execution on the leading edge of the timeout.
- * @param {number} [options.maxWait] The maximum time `func` is allowed to be delayed before it's called.
- * @param {boolean} [options.trailing=true] Specify execution on the trailing edge of the timeout.
+ * @param {boolean} [options.leading=false] Specify invoking on the leading
+ *  edge of the timeout.
+ * @param {number} [options.maxWait] The maximum time `func` is allowed to be
+ *  delayed before it is invoked.
+ * @param {boolean} [options.trailing=true] Specify invoking on the trailing
+ *  edge of the timeout.
  * @returns {Function} Returns the new debounced function.
  * @example
  *
  * // avoid costly calculations while the window size is in flux
- * var lazyLayout = _.debounce(calculateLayout, 150);
- * jQuery(window).on('resize', lazyLayout);
+ * jQuery(window).on('resize', _.debounce(calculateLayout, 150));
  *
- * // execute `sendMail` when the click event is fired, debouncing subsequent calls
+ * // invoke `sendMail` when the click event is fired, debouncing subsequent calls
  * jQuery('#postbox').on('click', _.debounce(sendMail, 300, {
  *   'leading': true,
  *   'trailing': false
- * });
+ * }));
  *
- * // ensure `batchLog` is executed once after 1 second of debounced calls
+ * // ensure `batchLog` is invoked once after 1 second of debounced calls
  * var source = new EventSource('/stream');
- * source.addEventListener('message', _.debounce(batchLog, 250, {
+ * jQuery(source).on('message', _.debounce(batchLog, 250, {
  *   'maxWait': 1000
- * }, false);
+ * }));
+ *
+ * // cancel a debounced call
+ * var todoChanges = _.debounce(batchLog, 1000);
+ * Object.observe(models.todo, todoChanges);
+ *
+ * Object.observe(models, function(changes) {
+ *   if (_.find(changes, { 'user': 'todo', 'type': 'delete'})) {
+ *     todoChanges.cancel();
+ *   }
+ * }, ['delete']);
+ *
+ * // ...at some point `models.todo` is changed
+ * models.todo.completed = true;
+ *
+ * // ...before 1 second has passed `models.todo` is deleted
+ * // which cancels the debounced `todoChanges` call
+ * delete models.todo;
  */
 function debounce(func, wait, options) {
   var args,
@@ -347,21 +426,32 @@ function debounce(func, wait, options) {
       maxWait = false,
       trailing = true;
 
-  if (!isFunction(func)) {
-    throw new TypeError;
+  if (typeof func != 'function') {
+    throw new TypeError(FUNC_ERROR_TEXT);
   }
-  wait = nativeMax(0, wait) || 0;
+  wait = wait < 0 ? 0 : (+wait || 0);
   if (options === true) {
     var leading = true;
     trailing = false;
   } else if (isObject(options)) {
     leading = options.leading;
-    maxWait = 'maxWait' in options && (nativeMax(wait, options.maxWait) || 0);
+    maxWait = 'maxWait' in options && nativeMax(+options.maxWait || 0, wait);
     trailing = 'trailing' in options ? options.trailing : trailing;
   }
-  var delayed = function() {
+
+  function cancel() {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+    if (maxTimeoutId) {
+      clearTimeout(maxTimeoutId);
+    }
+    maxTimeoutId = timeoutId = trailingCall = undefined;
+  }
+
+  function delayed() {
     var remaining = wait - (now() - stamp);
-    if (remaining <= 0) {
+    if (remaining <= 0 || remaining > wait) {
       if (maxTimeoutId) {
         clearTimeout(maxTimeoutId);
       }
@@ -377,9 +467,9 @@ function debounce(func, wait, options) {
     } else {
       timeoutId = setTimeout(delayed, remaining);
     }
-  };
+  }
 
-  var maxDelayed = function() {
+  function maxDelayed() {
     if (timeoutId) {
       clearTimeout(timeoutId);
     }
@@ -391,9 +481,9 @@ function debounce(func, wait, options) {
         args = thisArg = null;
       }
     }
-  };
+  }
 
-  return function() {
+  function debounced() {
     args = arguments;
     stamp = now();
     thisArg = this;
@@ -406,7 +496,7 @@ function debounce(func, wait, options) {
         lastCalled = stamp;
       }
       var remaining = maxWait - (stamp - lastCalled),
-          isCalled = remaining <= 0;
+          isCalled = remaining <= 0 || remaining > maxWait;
 
       if (isCalled) {
         if (maxTimeoutId) {
@@ -433,126 +523,22 @@ function debounce(func, wait, options) {
       args = thisArg = null;
     }
     return result;
-  };
+  }
+  debounced.cancel = cancel;
+  return debounced;
 }
 
-module.exports = debounce;
-
-},{"lodash.isfunction":8,"lodash.isobject":9,"lodash.now":6}],6:[function(require,module,exports){
 /**
- * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
- * Build: `lodash modularize modern exports="npm" -o ./npm/`
- * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
- * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
- * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
- * Available under MIT license <http://lodash.com/license>
- */
-var isNative = require('lodash._isnative');
-
-/**
- * Gets the number of milliseconds that have elapsed since the Unix epoch
- * (1 January 1970 00:00:00 UTC).
- *
- * @static
- * @memberOf _
- * @category Utilities
- * @example
- *
- * var stamp = _.now();
- * _.defer(function() { console.log(_.now() - stamp); });
- * // => logs the number of milliseconds it took for the deferred function to be called
- */
-var now = isNative(now = Date.now) && now || function() {
-  return new Date().getTime();
-};
-
-module.exports = now;
-
-},{"lodash._isnative":7}],7:[function(require,module,exports){
-/**
- * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
- * Build: `lodash modularize modern exports="npm" -o ./npm/`
- * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
- * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
- * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
- * Available under MIT license <http://lodash.com/license>
- */
-
-/** Used for native method references */
-var objectProto = Object.prototype;
-
-/** Used to resolve the internal [[Class]] of values */
-var toString = objectProto.toString;
-
-/** Used to detect if a method is native */
-var reNative = RegExp('^' +
-  String(toString)
-    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    .replace(/toString| for [^\]]+/g, '.*?') + '$'
-);
-
-/**
- * Checks if `value` is a native function.
- *
- * @private
- * @param {*} value The value to check.
- * @returns {boolean} Returns `true` if the `value` is a native function, else `false`.
- */
-function isNative(value) {
-  return typeof value == 'function' && reNative.test(value);
-}
-
-module.exports = isNative;
-
-},{}],8:[function(require,module,exports){
-/**
- * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
- * Build: `lodash modularize modern exports="npm" -o ./npm/`
- * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
- * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
- * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
- * Available under MIT license <http://lodash.com/license>
- */
-
-/**
- * Checks if `value` is a function.
- *
- * @static
- * @memberOf _
- * @category Objects
- * @param {*} value The value to check.
- * @returns {boolean} Returns `true` if the `value` is a function, else `false`.
- * @example
- *
- * _.isFunction(_);
- * // => true
- */
-function isFunction(value) {
-  return typeof value == 'function';
-}
-
-module.exports = isFunction;
-
-},{}],9:[function(require,module,exports){
-/**
- * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
- * Build: `lodash modularize modern exports="npm" -o ./npm/`
- * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
- * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
- * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
- * Available under MIT license <http://lodash.com/license>
- */
-var objectTypes = require('lodash._objecttypes');
-
-/**
- * Checks if `value` is the language type of Object.
+ * Checks if `value` is the language type of `Object`.
  * (e.g. arrays, functions, objects, regexes, `new Number(0)`, and `new String('')`)
  *
+ * **Note:** See the [ES5 spec](https://es5.github.io/#x8) for more details.
+ *
  * @static
  * @memberOf _
- * @category Objects
+ * @category Lang
  * @param {*} value The value to check.
- * @returns {boolean} Returns `true` if the `value` is an object, else `false`.
+ * @returns {boolean} Returns `true` if `value` is an object, else `false`.
  * @example
  *
  * _.isObject({});
@@ -565,38 +551,133 @@ var objectTypes = require('lodash._objecttypes');
  * // => false
  */
 function isObject(value) {
-  // check if the value is the ECMAScript language type of Object
-  // http://es5.github.io/#x8
-  // and avoid a V8 bug
-  // http://code.google.com/p/v8/issues/detail?id=2291
-  return !!(value && objectTypes[typeof value]);
+  // Avoid a V8 JIT bug in Chrome 19-20.
+  // See https://code.google.com/p/v8/issues/detail?id=2291 for more details.
+  var type = typeof value;
+  return type == 'function' || (value && type == 'object') || false;
 }
 
-module.exports = isObject;
+module.exports = debounce;
 
-},{"lodash._objecttypes":10}],10:[function(require,module,exports){
+},{"lodash.isnative":6}],6:[function(require,module,exports){
 /**
- * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
- * Build: `lodash modularize modern exports="npm" -o ./npm/`
- * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
- * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
- * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
- * Available under MIT license <http://lodash.com/license>
+ * lodash 3.0.0 (Custom Build) <https://lodash.com/>
+ * Build: `lodash modern modularize exports="npm" -o ./`
+ * Copyright 2012-2015 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.7.0 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2015 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <https://lodash.com/license>
  */
 
-/** Used to determine if values are of the language type Object */
-var objectTypes = {
-  'boolean': false,
-  'function': true,
-  'object': true,
-  'number': false,
-  'string': false,
-  'undefined': false
-};
+/** `Object#toString` result references. */
+var funcTag = '[object Function]';
 
-module.exports = objectTypes;
+/** Used to detect host constructors (Safari > 5). */
+var reHostCtor = /^\[object .+?Constructor\]$/;
 
-},{}],11:[function(require,module,exports){
+/**
+ * Used to match `RegExp` special characters.
+ * See this [article on `RegExp` characters](http://www.regular-expressions.info/characters.html#special)
+ * for more details.
+ */
+var reRegExpChars = /[.*+?^${}()|[\]\/\\]/g,
+    reHasRegExpChars = RegExp(reRegExpChars.source);
+
+/**
+ * Converts `value` to a string if it is not one. An empty string is returned
+ * for `null` or `undefined` values.
+ *
+ * @private
+ * @param {*} value The value to process.
+ * @returns {string} Returns the string.
+ */
+function baseToString(value) {
+  if (typeof value == 'string') {
+    return value;
+  }
+  return value == null ? '' : (value + '');
+}
+
+/**
+ * Checks if `value` is object-like.
+ *
+ * @private
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is object-like, else `false`.
+ */
+function isObjectLike(value) {
+  return (value && typeof value == 'object') || false;
+}
+
+/** Used for native method references. */
+var objectProto = Object.prototype;
+
+/** Used to resolve the decompiled source of functions. */
+var fnToString = Function.prototype.toString;
+
+/**
+ * Used to resolve the `toStringTag` of values.
+ * See the [ES spec](https://people.mozilla.org/~jorendorff/es6-draft.html#sec-object.prototype.tostring)
+ * for more details.
+ */
+var objToString = objectProto.toString;
+
+/** Used to detect if a method is native. */
+var reNative = RegExp('^' +
+  escapeRegExp(objToString)
+  .replace(/toString|(function).*?(?=\\\()| for .+?(?=\\\])/g, '$1.*?') + '$'
+);
+
+/**
+ * Checks if `value` is a native function.
+ *
+ * @static
+ * @memberOf _
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is a native function, else `false`.
+ * @example
+ *
+ * _.isNative(Array.prototype.push);
+ * // => true
+ *
+ * _.isNative(_);
+ * // => false
+ */
+function isNative(value) {
+  if (value == null) {
+    return false;
+  }
+  if (objToString.call(value) == funcTag) {
+    return reNative.test(fnToString.call(value));
+  }
+  return (isObjectLike(value) && reHostCtor.test(value)) || false;
+}
+
+/**
+ * Escapes the `RegExp` special characters "\", "^", "$", ".", "|", "?", "*",
+ * "+", "(", ")", "[", "]", "{" and "}" in `string`.
+ *
+ * @static
+ * @memberOf _
+ * @category String
+ * @param {string} [string=''] The string to escape.
+ * @returns {string} Returns the escaped string.
+ * @example
+ *
+ * _.escapeRegExp('[lodash](https://lodash.com/)');
+ * // => '\[lodash\]\(https://lodash\.com/\)'
+ */
+function escapeRegExp(string) {
+  string = baseToString(string);
+  return (string && reHasRegExpChars.test(string))
+    ? string.replace(reRegExpChars, '\\$&')
+    : string;
+}
+
+module.exports = isNative;
+
+},{}],7:[function(require,module,exports){
 var work = require('webworkify');
 var w = work(require('./work.js'));
 
@@ -637,7 +718,7 @@ function getDownloadLink(cb) {
   })
 }
 
-},{"./work.js":13,"webworkify":12}],12:[function(require,module,exports){
+},{"./work.js":9,"webworkify":8}],8:[function(require,module,exports){
 var bundleFn = arguments[3];
 var sources = arguments[4];
 var cache = arguments[5];
@@ -694,19 +775,17 @@ module.exports = function (fn) {
     ));
 };
 
-},{}],13:[function(require,module,exports){
+},{}],9:[function(require,module,exports){
 module.exports = function(self) {
   self.addEventListener('message', function(ev) {
-    console.log('worker', ev);
     var blob = exportWAV(ev.data.leftBuf, ev.data.rightBuf, ev.data.sampleRate);
-    self.postMessage(blob);
   }.bind(self));
 }
 
 function exportWAV(leftBuffer, rightBuffer, sampleRate) {
   var numChannel;
   var interleaved;
-  if (typeof rightBuf !== 'undefined'){
+  if (typeof rightBuffer !== 'undefined'){
     numChannel = 2;
     interleaved = interleave(leftBuffer, rightBuffer)
   }else{
@@ -798,7 +877,7 @@ function floatTo16BitPCM(output, offset, input){
   }
 }
 
-},{}],14:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 "use strict";
 
 /*
@@ -982,7 +1061,7 @@ WebAudioLoader.prototype.flushCache = function (){
 
 module.exports = WebAudioLoader;
 
-},{"lru-cache":15}],15:[function(require,module,exports){
+},{"lru-cache":11}],11:[function(require,module,exports){
 ;(function () { // closure for web browsers
 
 if (typeof module === 'object' && module.exports) {
