@@ -77,7 +77,6 @@ window.addEventListener('load', function(){
 				a.href = fileEvent;
 				var fileExt = file.name.split('.').pop();
 				var fileName = file.name.substr(0, file.name.length-fileExt.length-1);
-				console.log(fileName + "_resampled"+ fileExt);
 				a.download = fileName + "_resampled."+ fileExt;
 				a.click();
 				window.URL.revokeObjectURL(fileEvent);
@@ -91,7 +90,7 @@ window.addEventListener('load', function(){
 "use strict";
 
 var WebAudioLoader = require('webaudioloader');
-var encoder = require('encode-wav');
+var WavEncoder = require("wav-encoder");
 
 // WebAudio Shim.
 window.OfflineAudioContext = window.OfflineAudioContext || window.webkitOfflineAudioContext;
@@ -184,13 +183,17 @@ function resampler(input, targetSampleRate, oncomplete){
                         return resampeledBuffer;
                     },
                     getFile : function (fileCallback){
-                        encoder.encodeWAV(resampeledBuffer,resampeledBuffer.sampleRate,
-                            function(blob) {
-                                console.log('wav encoding complete: ', blob );
-                                if (blob) {
-                                    fileCallback(URL.createObjectURL(blob));
-                                }
-                            });
+                        var audioData = {
+                          sampleRate: resampeledBuffer.sampleRate,
+                          channelData: []
+                        };
+                        for (var i = 0; i < resampeledBuffer.numberOfChannels; i++){
+                            audioData.channelData[i] = resampeledBuffer.getChannelData(i);
+                        }
+                        WavEncoder.encode(audioData).then(function(buffer) {
+                          var blob = new Blob([buffer], {type: "audio/wav"});
+                          fileCallback(URL.createObjectURL(blob));
+                        });
                     }
                 });
             }
@@ -206,7 +209,7 @@ function resampler(input, targetSampleRate, oncomplete){
 
 module.exports = resampler;
 
-},{"encode-wav":7,"webaudioloader":10}],3:[function(require,module,exports){
+},{"wav-encoder":9,"webaudioloader":12}],3:[function(require,module,exports){
 module.exports = DragDrop
 
 var throttle = require('lodash.throttle')
@@ -721,206 +724,333 @@ function escapeRegExp(string) {
 module.exports = isNative;
 
 },{}],7:[function(require,module,exports){
-var work = require('webworkify');
-var w = work(require('./work.js'));
+"use strict";
+/* jshint esnext: false */
 
-module.exports = {
-  encodeWAV: encodeWAV,
-  getDownloadLink: getDownloadLink
-};
+/**
+  CAUTION!!!!
+  This file is used in WebWorker.
+  So, must write with ES5, not use ES6.
+  You need attention not to be traspiled by babel.
+*/
 
-function onComplete(cb) {
-  w.addEventListener('message', function(ev) {
-      cb(ev.data);
-  });
-}
+var self = {};
 
-function encodeWAV(input, sampleRate, cb) {
-  var inputType = Object.prototype.toString.call( input );
-  var leftBuffer;
-  var rightBuffer;
-  if(inputType === '[object AudioBuffer]'){
-    leftBuffer = input.getChannelData(0);
-    rightBuffer = input.numberOfChannels > 1 ? input.getChannelData(1) : undefined;
-  }else if (inputType === '[object Array]'){
-    leftBuffer = channelBufferArray[0];
-    rightBuffer = channelBufferArray[1];
-  }
-  w.postMessage({
-    leftBuf: leftBuffer,
-    rightBuf: rightBuffer,
-    sampleRate: sampleRate
-  });
-  onComplete(cb);
-}
-
-function getDownloadLink(cb) {
-  onComplete(function(blob) {
-    var url = (window.URL || window.webkitURL).createObjectURL(blob);
-    cb(url);
-  })
-}
-
-},{"./work.js":9,"webworkify":8}],8:[function(require,module,exports){
-var bundleFn = arguments[3];
-var sources = arguments[4];
-var cache = arguments[5];
-
-var stringify = JSON.stringify;
-
-module.exports = function (fn) {
-    var keys = [];
-    var wkey;
-    var cacheKeys = Object.keys(cache);
-    
-    for (var i = 0, l = cacheKeys.length; i < l; i++) {
-        var key = cacheKeys[i];
-        if (cache[key].exports === fn) {
-            wkey = key;
-            break;
-        }
+function encoder() {
+  self.onmessage = function (e) {
+    switch (e.data.type) {
+      case "encode":
+        self.encode(e.data.audioData, e.data.format).then(function (buffer) {
+          var data = {
+            type: "encoded",
+            callbackId: e.data.callbackId,
+            buffer: buffer
+          };
+          self.postMessage(data, [buffer]);
+        }, function (err) {
+          var data = {
+            type: "error",
+            callbackId: e.data.callbackId,
+            message: err.message
+          };
+          self.postMessage(data);
+        });
+        break;
     }
-    
-    if (!wkey) {
-        wkey = Math.floor(Math.pow(16, 8) * Math.random()).toString(16);
-        var wcache = {};
-        for (var i = 0, l = cacheKeys.length; i < l; i++) {
-            var key = cacheKeys[i];
-            wcache[key] = key;
-        }
-        sources[wkey] = [
-            Function(['require','module','exports'], '(' + fn + ')(self)'),
-            wcache
-        ];
+  };
+
+  self.encode = function (audioData, format) {
+    format.floatingPoint = !!format.floatingPoint;
+    format.bitDepth = format.bitDepth | 0 || 16;
+
+    return new Promise(function (resolve) {
+      var numberOfChannels = audioData.numberOfChannels;
+      var sampleRate = audioData.sampleRate;
+      var bytes = format.bitDepth >> 3;
+      var length = audioData.length * numberOfChannels * bytes;
+      var writer = new BufferWriter(44 + length);
+
+      writer.writeString("RIFF"); // RIFF header
+      writer.writeUint32(writer.length - 8); // file length
+      writer.writeString("WAVE"); // RIFF Type
+
+      writer.writeString("fmt "); // format chunk identifier
+      writer.writeUint32(16); // format chunk length
+      writer.writeUint16(format.floatingPoint ? 3 : 1); // format (PCM)
+      writer.writeUint16(numberOfChannels); // number of channels
+      writer.writeUint32(sampleRate); // sample rate
+      writer.writeUint32(sampleRate * numberOfChannels * bytes); // byte rate
+      writer.writeUint16(numberOfChannels * bytes); // block size
+      writer.writeUint16(format.bitDepth); // bits per sample
+
+      writer.writeString("data"); // data chunk identifier
+      writer.writeUint32(length); // data chunk length
+
+      var channelData = audioData.buffers.map(function (buffer) {
+        return new Float32Array(buffer);
+      });
+
+      writer.writePCM(channelData, format);
+
+      resolve(writer.toArrayBuffer());
+    });
+  };
+
+  function BufferWriter(length) {
+    this.buffer = new ArrayBuffer(length);
+    this.view = new DataView(this.buffer);
+    this.length = length;
+    this.pos = 0;
+  }
+
+  BufferWriter.prototype.writeUint8 = function (data) {
+    this.view.setUint8(this.pos, data);
+    this.pos += 1;
+  };
+
+  BufferWriter.prototype.writeUint16 = function (data) {
+    this.view.setUint16(this.pos, data, true);
+    this.pos += 2;
+  };
+
+  BufferWriter.prototype.writeUint32 = function (data) {
+    this.view.setUint32(this.pos, data, true);
+    this.pos += 4;
+  };
+
+  BufferWriter.prototype.writeString = function (data) {
+    for (var i = 0; i < data.length; i++) {
+      this.writeUint8(data.charCodeAt(i));
     }
-    var skey = Math.floor(Math.pow(16, 8) * Math.random()).toString(16);
-    
-    var scache = {}; scache[wkey] = wkey;
-    sources[skey] = [
-        Function(['require'],'require(' + stringify(wkey) + ')(self)'),
-        scache
-    ];
-    
-    var src = '(' + bundleFn + ')({'
-        + Object.keys(sources).map(function (key) {
-            return stringify(key) + ':['
-                + sources[key][0]
-                + ',' + stringify(sources[key][1]) + ']'
-            ;
-        }).join(',')
-        + '},{},[' + stringify(skey) + '])'
-    ;
-    
-    var URL = window.URL || window.webkitURL || window.mozURL || window.msURL;
-    
-    return new Worker(URL.createObjectURL(
-        new Blob([src], { type: 'text/javascript' })
-    ));
-};
+  };
 
-},{}],9:[function(require,module,exports){
-module.exports = function(self) {
-  self.addEventListener('message', function(ev) {
-    var blob = exportWAV(ev.data.leftBuf, ev.data.rightBuf, ev.data.sampleRate);
-  }.bind(self));
+  BufferWriter.prototype.writePCM8 = function (x) {
+    x = Math.max(-128, Math.min(x * 128, 127)) | 0;
+    this.view.setInt8(this.pos, x);
+    this.pos += 1;
+  };
+
+  BufferWriter.prototype.writePCM16 = function (x) {
+    x = Math.max(-32768, Math.min(x * 32768, 32767)) | 0;
+    this.view.setInt16(this.pos, x, true);
+    this.pos += 2;
+  };
+
+  BufferWriter.prototype.writePCM24 = function (x) {
+    x = Math.max(-8388608, Math.min(x * 8388608, 8388607)) | 0;
+    this.view.setUint8(this.pos + 0, x >> 0 & 255);
+    this.view.setUint8(this.pos + 1, x >> 8 & 255);
+    this.view.setUint8(this.pos + 2, x >> 16 & 255);
+    this.pos += 3;
+  };
+
+  BufferWriter.prototype.writePCM32 = function (x) {
+    x = Math.max(-2147483648, Math.min(x * 2147483648, 2147483647)) | 0;
+    this.view.setInt32(this.pos, x, true);
+    this.pos += 4;
+  };
+
+  BufferWriter.prototype.writePCM32F = function (x) {
+    this.view.setFloat32(this.pos, x, true);
+    this.pos += 4;
+  };
+
+  BufferWriter.prototype.writePCM64F = function (x) {
+    this.view.setFloat64(this.pos, x, true);
+    this.pos += 8;
+  };
+
+  BufferWriter.prototype.writePCM = function (channelData, format) {
+    var length = channelData[0].length;
+    var numberOfChannels = channelData.length;
+    var method = "writePCM" + format.bitDepth;
+
+    if (format.floatingPoint) {
+      method += "F";
+    }
+
+    if (!this[method]) {
+      throw new Error("not suppoerted bit depth " + format.bitDepth);
+    }
+
+    for (var i = 0; i < length; i++) {
+      for (var ch = 0; ch < numberOfChannels; ch++) {
+        this[method](channelData[ch][i]);
+      }
+    }
+  };
+
+  BufferWriter.prototype.toArrayBuffer = function () {
+    return this.buffer;
+  };
+
+  self.BufferWriter = BufferWriter;
 }
 
-function exportWAV(leftBuffer, rightBuffer, sampleRate) {
-  var numChannel;
-  var interleaved;
-  if (typeof rightBuffer !== 'undefined'){
-    numChannel = 2;
-    interleaved = interleave(leftBuffer, rightBuffer)
-  }else{
-    numChannel = 1;
-    interleaved = leftBuffer;
+encoder.self = encoder.util = self;
+
+module.exports = encoder;
+},{}],8:[function(require,module,exports){
+"use strict";
+
+var _interopRequire = function (obj) { return obj && obj.__esModule ? obj["default"] : obj; };
+
+var _createClass = (function () { function defineProperties(target, props) { for (var key in props) { var prop = props[key]; prop.configurable = true; if (prop.value) prop.writable = true; } Object.defineProperties(target, props); } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+
+var _classCallCheck = function (instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } };
+
+"use stirct";
+
+var InlineWorker = _interopRequire(require("inline-worker"));
+
+var encoder = _interopRequire(require("./encoder-worker"));
+
+var Encoder = (function () {
+  function Encoder() {
+    var _this = this;
+
+    var format = arguments[0] === undefined ? {} : arguments[0];
+
+    _classCallCheck(this, Encoder);
+
+    this.format = {
+      floatingPoint: !!format.floatingPoint,
+      bitDepth: format.bitDepth | 0 || 16 };
+    this._worker = new InlineWorker(encoder, encoder.self);
+    this._worker.onmessage = function (e) {
+      var callback = _this._callbacks[e.data.callbackId];
+
+      if (callback) {
+        if (e.data.type === "encoded") {
+          callback.resolve(e.data.buffer);
+        } else {
+          callback.reject(new Error(e.data.message));
+        }
+      }
+
+      _this._callbacks[e.data.callbackId] = null;
+    };
+    this._callbacks = [];
   }
 
-  var dataview = encodeWAV(interleaved, sampleRate, numChannel);
-  var audioBlob = new Blob([dataview], {type: "audio/wav"});
+  _createClass(Encoder, {
+    canProcess: {
+      value: function canProcess(format) {
+        return Encoder.canProcess(format);
+      }
+    },
+    encode: {
+      value: function encode(audioData, format) {
+        var _this = this;
 
-  this.postMessage(audioBlob);
-}
+        if (format == null || typeof format !== "object") {
+          format = this.format;
+        }
+        return new Promise(function (resolve, reject) {
+          var callbackId = _this._callbacks.length;
 
-function mergeBuffers(recBuffers, recLength){
-  var result = new Float32Array(recLength);
-  var offset = 0;
+          _this._callbacks.push({ resolve: resolve, reject: reject });
 
-  for (var i = 0; i < recBuffers.length; i++){
-    result.set(recBuffers[i], offset);
-    offset += recBuffers[i].length;
+          var numberOfChannels = audioData.channelData.length;
+          var length = audioData.channelData[0].length;
+          var sampleRate = audioData.sampleRate;
+          var buffers = audioData.channelData.map(function (data) {
+            return data.buffer;
+          });
+
+          audioData = { numberOfChannels: numberOfChannels, length: length, sampleRate: sampleRate, buffers: buffers };
+
+          _this._worker.postMessage({
+            type: "encode", audioData: audioData, format: format, callbackId: callbackId
+          }, audioData.buffers);
+        });
+      }
+    }
+  }, {
+    canProcess: {
+      value: function canProcess(format) {
+        if (format && (format === "wav" || format.type === "wav")) {
+          return "maybe";
+        }
+        return "";
+      }
+    },
+    encode: {
+      value: function encode(audioData, format) {
+        return new Encoder(format).encode(audioData);
+      }
+    }
+  });
+
+  return Encoder;
+})();
+
+module.exports = Encoder;
+},{"./encoder-worker":7,"inline-worker":10}],9:[function(require,module,exports){
+"use strict";
+
+var _interopRequire = function (obj) { return obj && obj.__esModule ? obj["default"] : obj; };
+
+var Encoder = _interopRequire(require("./encoder"));
+
+module.exports = Encoder;
+},{"./encoder":8}],10:[function(require,module,exports){
+"use strict";
+
+module.exports = require("./inline-worker");
+},{"./inline-worker":11}],11:[function(require,module,exports){
+(function (global){
+"use strict";
+
+var _createClass = (function () { function defineProperties(target, props) { for (var key in props) { var prop = props[key]; prop.configurable = true; if (prop.value) prop.writable = true; } Object.defineProperties(target, props); } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+
+var _classCallCheck = function (instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } };
+
+var WORKER_ENABLED = !!(global === global.window && global.URL && global.Blob && global.Worker);
+
+var InlineWorker = (function () {
+  function InlineWorker(func, self) {
+    var _this = this;
+
+    _classCallCheck(this, InlineWorker);
+
+    if (WORKER_ENABLED) {
+      var functionBody = func.toString().trim().match(/^function\s*\w*\s*\([\w\s,]*\)\s*{([\w\W]*?)}$/)[1];
+      var url = global.URL.createObjectURL(new global.Blob([functionBody], { type: "text/javascript" }));
+
+      return new global.Worker(url);
+    }
+
+    this.self = self;
+    this.self.postMessage = function (data) {
+      setTimeout(function () {
+        _this.onmessage({ data: data });
+      }, 0);
+    };
+
+    setTimeout(function () {
+      func.call(self);
+    }, 0);
   }
 
-  return result;
-}
+  _createClass(InlineWorker, {
+    postMessage: {
+      value: function postMessage(data) {
+        var _this = this;
 
-function interleave(leftBuffer, rightBuffer){
-  var length = leftBuffer.length + rightBuffer.length;
-  var result = new Float32Array(length);
+        setTimeout(function () {
+          _this.self.onmessage({ data: data });
+        }, 0);
+      }
+    }
+  });
 
-  var idx = 0,
-      bufIdx = 0;
+  return InlineWorker;
+})();
 
-  while (idx < length) {
-    // idx++
-    result[idx++] = leftBuffer[bufIdx];
-    result[idx++] = rightBuffer[bufIdx];
-    bufIdx++;
-  }
-
-  return result;
-}
-
-function writeString(view, offset, string) {
-  for (var i = 0; i < string.length; i++){
-    view.setUint8(offset + i, string.charCodeAt(i));
-  }
-}
-
-function encodeWAV(samples, sampleRate, numChannel){
-  var buffer = new ArrayBuffer(44 + samples.length * 2);
-  var view = new DataView(buffer);
-
-  /* RIFF identifier */
-  writeString(view, 0, 'RIFF');
-  /* RIFF chunk length */
-  view.setUint32(4, 36 + samples.length * 2, true);
-  /* RIFF type */
-  writeString(view, 8, 'WAVE');
-  /* format chunk identifier */
-  writeString(view, 12, 'fmt ');
-  /* format chunk length */
-  view.setUint32(16, 16, true);
-  /* sample format (raw) */
-  view.setUint16(20, 1, true);
-  /* channel count */
-  view.setUint16(22, numChannel, true);
-  /* sample rate */
-  view.setUint32(24, sampleRate, true);
-  /* byte rate (sample rate * block align) */
-  view.setUint32(28, sampleRate * 4, true);
-  /* block align (channel count * bytes per sample) */
-  view.setUint16(32, 4, true);
-  /* bits per sample */
-  view.setUint16(34, 16, true);
-  /* data chunk identifier */
-  writeString(view, 36, 'data');
-  /* data chunk length */
-  view.setUint32(40, samples.length * 2, true);
-
-  floatTo16BitPCM(view, 44, samples);
-
-  return view;
-}
-
-function floatTo16BitPCM(output, offset, input){
-  for (var i = 0; i < input.length; i++, offset+=2){
-    var s = Math.max(-1, Math.min(1, input[i]));
-    output.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-  }
-}
-
-},{}],10:[function(require,module,exports){
+module.exports = InlineWorker;
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{}],12:[function(require,module,exports){
 "use strict";
 
 /*
@@ -1104,7 +1234,7 @@ WebAudioLoader.prototype.flushCache = function (){
 
 module.exports = WebAudioLoader;
 
-},{"lru-cache":11}],11:[function(require,module,exports){
+},{"lru-cache":13}],13:[function(require,module,exports){
 ;(function () { // closure for web browsers
 
 if (typeof module === 'object' && module.exports) {
