@@ -1,14 +1,17 @@
 # Audio-Resampler
 
+[![npm version](https://badge.fury.io/js/audio-resampler.svg)](http://badge.fury.io/js/audio-resampler)
+
 Simple WebAudio based resampling library.
 
-### Runs on all [modern browsers which support WebAudio](http://caniuse.com/#search=audio-api).
 
-## Installtion
+#### Runs on all [modern browsers which support WebAudio](http://caniuse.com/#search=audio-api).
 
-	`npm install audio-resampler`
+## Installation
 
-### API
+`npm install audio-resampler`
+
+## API
 
 ```
 resampler = require('audio-resampler');
@@ -19,13 +22,13 @@ resampler(input, targetSampleRate, oncomplete);
 
 `targetSampleRate` : The target sample rate after the re-sampling process. This number is limted based on the browser implementation (usually >=3000, <=192000)
 
-`oncomplete`: Callback when the resampling process is completed. The argument to this callback is an Object which supports the following methods.
+`oncomplete`: Callback when the resampling process is completed. The argument to this callback is an Object which supports the following methods:
 
 `getAudioBuffer` : Returns the resampler AudioBuffer
 
 `getFile` : Returns a ObjectURL of a WAV file created from the resampled Audio.
 
-### Example Usage
+## Example Usage
 
 ```
 resampler = require('audio-resampler');
@@ -43,5 +46,9 @@ resampler(URL, 192000, function(event){
 	});
 });
 ```
+
+## Test
+
+To test this repository, you can run a local server using the `npm start` command which serves a simple drag-and-drop interface based webpage to resampler audio files.
 
 

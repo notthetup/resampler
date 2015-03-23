@@ -1,11 +1,10 @@
 {
   "name": "audio-resampler",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Simple WebAudio based resampling library",
   "main": "lib/resampler.js",
   "files": ["lib/resampler.js"],
   "scripts": {
-    "test": "npm test",
     "build": "jshint index.js lib/resampler.js && browserify index.js > bundle.js",
     "watch:index": "watch 'npm run build' . --wait=5",
     "build:watch": "parallelshell 'npm run watch:index' 'http-server'",

@@ -3,8 +3,6 @@
 var resampler = require('./lib/resampler.js');
 var dragDrop = require('drag-drop');
 
-
-
 window.addEventListener('load', function(){
 
 	// dom elements
@@ -13,11 +11,6 @@ window.addEventListener('load', function(){
 	var input = document.getElementById('input');
 	var note = document.getElementById('note');
 	var spinner = document.getElementById('spinner');
-
-	//
-
-
-
 
 	//monkeypatch
 	var ddEventListeners = {};
