@@ -59,7 +59,7 @@ h6,
 
 h1,
 .h1 {
-	font-size: 39px;
+	font-size: 60px;
 }
 h2,
 .h2 {
@@ -90,41 +90,93 @@ h6,
 .dropzone {
 	border: 2px solid rgba(0, 0, 0, 0.3);
 	border-radius: 5px;
-	background: white;
 	max-width: 60%;
 	margin-left: auto;
 	margin-right: auto;
-	min-height: 150px;
-	background: white;
+	min-height: 200px;
 	padding: 20px 20px;
 }
 .dropzone .message {
-	font-weight: 400;
-	font-family: Roboto, 'Open Sans', sans-serif;
-	font-kerning: auto;
-	font-size: 20px;
 	cursor: pointer;
 	text-align: center;
 	margin: 2em 0;
 }
-.dropzone .message .note {
-	font-size: 0.8em;
-	font-weight: 200;
-	display: block;
-	margin-top: 1.4rem;
-}
-h1,h2,h3 {
+
+.spinner {
+	margin: 100px auto;
+	width: 50px;
+	height: 30px;
 	text-align: center;
-	margin-top: 21px;
-	margin-bottom: 10.5px;
+	font-size: 10px;
 }
 
-select {
-	background: transparent;
-	border: 1px solid #daa;
-	padding-left: 2px;
-	padding-bottom: 2px;
-	-webkit-appearance: none;
-	-moz-appearance: none;
-	appearance: none;
+.spinner > div {
+	background-color: #333;
+	height: 100%;
+	width: 6px;
+	display: inline-block;
+
+	-webkit-animation: stretchdelay 1.2s infinite ease-in-out;
+	animation: stretchdelay 1.2s infinite ease-in-out;
 }
+
+.spinner .rect2 {
+	-webkit-animation-delay: -1.1s;
+	animation-delay: -1.1s;
+}
+
+.spinner .rect3 {
+	-webkit-animation-delay: -1.0s;
+	animation-delay: -1.0s;
+}
+
+.spinner .rect4 {
+	-webkit-animation-delay: -0.9s;
+	animation-delay: -0.9s;
+}
+
+.spinner .rect5 {
+	-webkit-animation-delay: -0.8s;
+	animation-delay: -0.8s;
+}
+
+@-webkit-keyframes stretchdelay {
+	0%, 40%, 100% { -webkit-transform: scaleY(0.4) }
+	20% { -webkit-transform: scaleY(1.0) }
+}
+
+@keyframes stretchdelay {
+	0%, 40%, 100% {
+		transform: scaleY(0.4);
+		-webkit-transform: scaleY(0.4);
+		}  20% {
+			transform: scaleY(1.0);
+			-webkit-transform: scaleY(1.0);
+		}
+	}
+
+	h1,h2,h3 {
+		text-align: center;
+		margin-top: 21px;
+		margin-bottom: 10.5px;
+	}
+
+	select {
+		background: transparent;
+		border: 1px dashed #ddd;
+		padding-left: 2px;
+		padding-bottom: 2px;
+/*	-webkit-appearance: none;
+	-moz-appearance: none;
+	appearance: none;*/
+}
+
+/*
+1. bigger title
+2. make the title and tagline same width
+3. there should be a down arrow in the dropdown
+4. starting state of the dropdown should have "Select sampling rate"
+5. put a dashed border for the drop files section and grey out the text and border
+6. make the drop files section bigger height
+7. put a grey border for the dropdown instead of red
+*/

@@ -23,9 +23,16 @@
 	</h2>
 	<form class="dropzone" id="dropzone" disabled>
   <div id="message" class="message">
-    <h4>Drop files here or click to upload an audio file to resample</h3>
+    <h4 id="note">Drop files here or click to upload an audio file to resample</h3>
+    <div id="spinner" class="spinner" style="display:none">
+      <div class="rect1"></div>
+      <div class="rect2"></div>
+      <div class="rect3"></div>
+      <div class="rect4"></div>
+      <div class="rect5"></div>
+    </div>
   </div>
-  <input id="input" type="file" style="visibility:hidden">
+  <input id="input" type="file" style="display:none">
 </form>
 </body>
 </html>
