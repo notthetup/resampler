@@ -1,5 +1,5 @@
 {
-  "name": "resampler",
+  "name": "audio-resampler",
   "version": "1.0.0",
   "description": "Simple WebAudio based resampling library",
   "main": "lib/resampler.js",
