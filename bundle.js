@@ -123,7 +123,7 @@ function resampler(input, targetSampleRate, oncomplete){
     }
 
     function resampleAudioBuffer(audioBuffer){
-        console.log('Starting Resampling - ', audioBuffer);
+
 
         var numCh_ = audioBuffer.numberOfChannels;
         var numFrames_ = audioBuffer.length*targetSampleRate/audioBuffer.sampleRate;
