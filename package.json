@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Simple WebAudio based resampling library",
   "main": "lib/resampler.js",
+  "files": ["lib/resampler.js"],
   "scripts": {
     "test": "npm test",
     "build": "jshint index.js lib/resampler.js && browserify index.js > bundle.js",
