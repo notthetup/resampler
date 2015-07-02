@@ -1,10 +1,10 @@
-"use strict";
+
 
 var resampler = require('./lib/resampler.js');
 var dragDrop = require('drag-drop');
 
 window.addEventListener('load', function(){
-
+	"use strict";
 	// dom elements
 	var fSelectOption = document.getElementById('freqSelect');
 	var messageBox = document.getElementById('message');
