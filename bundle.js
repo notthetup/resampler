@@ -5,7 +5,6 @@ var resampler = require('./lib/resampler.js');
 var dragDrop = require('drag-drop');
 
 window.addEventListener('load', function(){
-
 	// dom elements
 	var fSelectOption = document.getElementById('freqSelect');
 	var messageBox = document.getElementById('message');
@@ -66,7 +65,7 @@ window.addEventListener('load', function(){
 				dragDrop('#dropzone');
 				var a = document.createElement("a");
 				document.body.appendChild(a);
-				a.style = "display: none";
+				a.style.display = "none";
 				a.href = fileEvent;
 				var fileExt = file.name.split('.').pop();
 				var fileName = file.name.substr(0, file.name.length-fileExt.length-1);
