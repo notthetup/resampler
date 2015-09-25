@@ -1,0 +1,24 @@
+{
+  "name": "resampler",
+  "main": "lib/resampler.js",
+  "version": "1.0.1",
+  "homepage": "https://github.com/notthetup/resampler",
+  "authors": [
+    "Chinmay Pendharkar <notthetup@gmail.com>"
+  ],
+  "description": "Simple WebAudio based resampling library",
+  "moduleType": [],
+  "keywords": [
+    "resample",
+    "audio",
+    "webaudio"
+  ],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ]
+}
