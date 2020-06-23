@@ -22,6 +22,8 @@ resampler(input, targetSampleRate, oncomplete);
 
 `targetSampleRate` : The target sample rate after the re-sampling process. This number is limted based on the browser implementation (usually >=3000, <=192000)
 
+`targetBitDepth` : The target bit depth after the re-sampling process. This number is limted based on the browser implementation (usually >=16, <=32)
+
 `oncomplete`: Callback when the resampling process is completed. The argument to this callback is an Object which supports the following methods:
 
 `getAudioBuffer` : Returns the resampler AudioBuffer
@@ -33,7 +35,7 @@ resampler(input, targetSampleRate, oncomplete);
 ```
 resampler = require('audio-resampler');
 var URL = "https://dl.dropboxusercontent.com/u/957/audio/sine.wav"
-resampler(URL, 192000, function(event){
+resampler(URL, 192000, 24, function(event){
 	event.getFile(function(fileEvent){
 		var a = document.createElement("a");
 		document.body.appendChild(a);
