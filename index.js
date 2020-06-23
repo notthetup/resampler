@@ -55,7 +55,7 @@ window.addEventListener('load', function(){
 		spinner.style.display = "inherit";
 		input.disabled = true;
 		disableDragDrop(dropzone);
-		resampler(file, targetSampleRate, function(event){
+		resampler(file, targetSampleRate, 24, function(event){
 			event.getFile(function(fileEvent){
 				console.log(fileEvent);
 				spinner.style.display = "none";
